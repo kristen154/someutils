@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+	<meta http-equiv="X-UA_Compatible" content="IE=edge,chrome=1">
+	<meta name="viewport" content="width=device-width,initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+	<title></title>
+	<style>
+
+.imgscale-pack{
+	width:100%;
+	height:100%;
+	position:fixed;
+	left:0;
+	top:0;
+	background:rgba(0,0,0,0.8);
+	display:none;
+	z-index:9999;
+}
+.imgscale-pack .imgscale-close{
+	height:40px;
+	width:40px;
+	background: url(toucharticle/images/close.png) no-repeat;
+	background-size: 100%;
+	position:absolute;
+	right:0px;
+	top:0px;
+	z-index:10;
+	cursor:pointer;
+}
+.imgscale-pack .imgscale-img{
+	width:100%;
+	height:100%;
+	position:absolute;
+	left:0;
+	top:0;
+	overflow:hidden;
+}
+.imgscale-pack .imgscale-img img{
+	width:100%;
+	position:absolute;
+	top:50%;
+}
+	</style>
+</head>
+<body>
+<!-- <div class="wrapper" id="divbox"><img id="imgbox" src="/ditu.png" alt=""></div> -->
+<ul class="zhengwen">
+        <li><img src="/ditu.png" /></li>
+	</ul>
+
+
+	<div class="imgscale-pack">
+		<div class="imgscale-close"></div>
+		<div class="imgscale-img">
+			<img src="" />
+			<div id="mes"></div>
+		</div>
+	</div>
+	<script type="text/javascript">
+	function C(str){var mes = document.getElementById("mes");mes.innerHTML=str}
+	var ImagesZoom = function(){}
+	var document = window.document,
+		support = {
+			transform3d: ("WebKitCSSMatrix" in window && "m11" in new WebKitCSSMatrix()),
+			touch: ("ontouchstart" in window)
+		};
+		
+	function getTranslate(x, y){
+		var distX = x, distY = y;
+		return support.transform3d ? "translate3d("+ distX +"px, "+ distY +"px, 0)" : "translate("+ distX +"px, "+ distY +"px)";
+	}
+
+	function getPage(event, page) {
+		return support.touch ? event.changedTouches[0][page] : event[page];
+	}
+
+	ImagesZoom.prototype = {
+		init:function(){
+			var self = this
+			console.log(document.querySelector(".zhengwen img"))
+			var imgList = document.querySelector(".zhengwen img"),
+			zoomMask = document.querySelector(".imgscale-pack"),
+			zoomImg = document.querySelector(".imgscale-pack .imgscale-img img"),
+			zoomClose = document.querySelector("imgscale-close");
+			imgSrc = ""
+				self.buffMove   = 3; //缓冲系数
+			self.buffScale  = 2; //放大系数
+			self.finger = false; //触摸手指的状态 false：单手指 true：多手指
+			self._destroy();
+			/*zoomClose.addEventListener("click", function(){
+				self._close();
+			}, false);*/
+			imgList.addEventListener('click',function(e){
+				imgSrc = this.getAttribute("src");
+				C(imgSrc);
+				zoomMask.style.cssText = 'display:block';
+				zoomImg.src=imgSrc
+				zoomImg.onload = function(){
+				zoomImg.style.cssText = "margin-top:-"+(zoomImg.offsetHeight/2)+"px";
+				//禁止屏幕滑动
+				document.addEventListener('touchmove',self.eventStop,false);
+				self.imgBaseWidth = zoomImg.offsetWidth;
+				self.imgBaseHeight = zoomImg.offsetHeight;
+				self.addEventStart({
+					wrapX:zoomMask.offsetWidth,
+					wrapY:zoomMask.offsetHeight,
+					mapX:zoomImg.width,
+					mapY:zoomImg.height
+				});
+			}
+			},false);
+			zoomMask.addEventListener('click',function(e){
+				self._close();
+			});
+
+		},
+		_close:function(){
+			var self = this;
+			var zoomMask  = document.querySelector(".imgscale-pack"),
+				zoomImg   = document.querySelector(".imgscale-pack .imgscale-img img");
+
+				zoomMask.style.cssText = "display:none";
+				zoomImg.src = "";
+				zoomImg.style.cssText = "";
+				zoomMask.style.cssText = 'display:hidden';
+				document.removeEventListener("touchmove", self.eventStop, false);
+		},
+		addEventStart: function(param){
+			console.log(param)
+			var self   = this,
+				params = param || {};
+
+			self.element = document.querySelector(".imgscale-pack img");
+
+			//config set
+			self.wrapX = params.wrapX || 0; 	//可视区域宽度
+			self.wrapY = params.wrapY || 0; 	//可视区域高度
+			self.mapX  = params.mapX || 0; 	    //地图宽度
+			self.mapY  = params.mapY || 0;      //地图高度
+
+			self.outDistY = (self.mapY - self.wrapY)/2; //图片超过一屏的时候有用
+			
+			self.width  = self.mapX - self.wrapX;   //地图的宽度减去可视区域的宽度 ?
+			self.height = self.mapY - self.wrapY;   //地图的高度减去可视区域的高度
+
+			self.element.addEventListener("touchstart",function(e){
+				e.preventDefault();
+				var touchTarget = e.targetTouches.length;
+				self._changeData(); //重新初始化图片、可视区域数据，由于放大会产生新的计算
+				if(touchTarget==1){
+					self.basePageX = getPage(e,"pageX");
+					self.basePageY = getPage(e,"pageY");
+					self.finger=false;
+				}else{
+					self.startFingerX=self.getTouchDist(e).x;
+					self.startFingerY=self.getTouchDist(e).y;
+					self.startFingerDist=self.getTouchDist(e).dist;
+					self.finger = true;
+				}
+			},false);
+			self.element.addEventListener("touchmove",function(e){
+				e.preventDefault();
+				e.stopPropagation();
+				var touchTarget = e.targetTouches.length;
+
+				if(touchTarget==1 && !self.finger){
+					pageX = getPage(e, "pageX"), //获取移动坐标
+					pageY = getPage(e, "pageY");
+					// 获得移动距离
+					self.distX = (pageX - self.basePageX) + self.newX;
+					self.distY = (pageY - self.basePageY) + self.newY;
+
+					if(self.distX > 0){
+						self.moveX = Math.round(self.distX/self.buffMove);
+					}else if( self.distX<=0 && self.distX>=-self.width ){
+						self.moveX = self.distX;
+					}else if(self.distX < -self.width ){
+						self.moveX = -self.width+Math.round((self.distX+self.width)/self.buffMove);
+					}
+					self.movePos();
+					self.finger = false;
+				
+				}
+				if(touchTarget>=2){
+					var nowFingerDist = self.getTouchDist(e).dist;
+					//C(nowFingerDist)
+					var ratio = nowFingerDist/self.startFingerDist;
+					
+					var imgWidth = Math.round(self.mapX*ratio);
+					var imgHeight = Math.round(self.mapY*ratio);
+					self.imgNewX = Math.round(self.startFingerX * ratio - self.startFingerX - self.newX * ratio);
+					self.imgNewY = Math.round((self.startFingerY * ratio - self.startFingerY)/2 - self.newY * ratio);
+					C(self.newY)
+					if(imgWidth >= self.imgBaseWidth){
+						self.element.style.width = imgWidth + "px";
+						self.refresh(-self.imgNewX, -self.imgNewY, "0s", "ease");
+						self.finger = true;	
+					}else{
+						if(imgWidth < self.imgBaseWidth){
+							self.element.style.width = self.imgBaseWidth + "px";
+						}
+					}
+				}
+			},false);
+		self.element.addEventListener("touchend",function(e){
+				//self._changeData(); //重新计算数据
+				self.mapX     = self.element.offsetWidth; 	  //地图宽度
+				self.mapY     = self.element.offsetHeight;      //地图高度
+				// this.outDistY = (this.mapY - this.wrapY)/2; //当图片高度超过屏幕的高度时候。图片是垂直居中的，这时移动有个高度做为缓冲带
+				self.width    = self.mapX - self.wrapX;   //地图的宽度减去可视区域的宽度
+				self.height   = self.mapY - self.wrapY;   //
+				if(self.finger){
+					self.distX = -self.imgNewX;
+					self.distY = -self.imgNewY;
+				}
+
+				if( self.distX>0 ){
+					self.newX = 0;
+				}else if( self.distX<=0 && self.distX>=-self.width ){
+					self.newX = self.distX;
+					self.newY = self.distY;
+				}else if( self.distX<-self.width ){
+					self.newX = -self.width;
+				}
+				self.reset();
+				},false);
+		},
+		_destroy: function(){
+			this.distX = 0;
+			this.distY = 0;
+			this.newX  = 0;
+			this.newY  = 0;
+		},
+		// 更新地图信息
+		_changeData: function(){
+			this.mapX     = this.element.offsetWidth; 	  //地图宽度
+			this.mapY     = this.element.offsetHeight;      //地图高度
+			// this.outDistY = (this.mapY - this.wrapY)/2; //当图片高度超过屏幕的高度时候。图片是垂直居中的，这时移动有个高度做为缓冲带
+			this.width    = this.mapX - this.wrapX;   //地图的宽度减去可视区域的宽度
+			this.height   = this.mapY - this.wrapY;   //地图的高度减去可视区域的高度
+		},
+		// 移动坐标
+		movePos: function(){
+			var self = this;
+
+			if(self.height<0){
+				if(self.element.offsetWidth == self.imgBaseWidth){
+					self.moveY = Math.round(self.distY/self.buffMove);//四舍五入
+				}else{
+					var moveTop = Math.round((self.element.offsetHeight-self.imgBaseHeight)/2);
+					self.moveY = -moveTop + Math.round((self.distY + moveTop)/self.buffMove);
+				}
+			}else{
+				var a = Math.round((self.wrapY - self.imgBaseHeight)/2),
+					b = self.element.offsetHeight - self.wrapY + Math.round(self.wrapY - self.imgBaseHeight)/2;
+
+				if(self.distY >= -a){
+					self.moveY = Math.round((self.distY + a)/self.buffMove) - a;
+				}else if(self.distY <= -b){
+					self.moveY = Math.round((self.distY + b)/self.buffMove) - b;
+				}else{
+					self.moveY = self.distY;
+				}
+			}
+			self.refresh(self.moveX, self.moveY, "0s", "ease");
+		},
+// 重置数据
+		reset: function(){
+			var self = this,
+				hideTime = ".2s";
+			if(self.height<0){
+				self.newY = -Math.round(self.element.offsetHeight - self.imgBaseHeight)/2;
+			}else{
+				var a = Math.round((self.wrapY - self.imgBaseHeight)/2),
+					b = self.element.offsetHeight - self.wrapY + Math.round(self.wrapY - self.imgBaseHeight)/2;
+
+				if(self.distY >= -a){
+					self.newY = -a;
+				}else if(self.distY <= -b){
+					self.newY = -b;
+				}else{
+					self.newY = self.distY;
+				}
+			}
+			self.refresh(self.newX, self.newY, hideTime, "ease-in-out");
+		},
+		
+// 	执行图片移动
+		refresh: function(x, y, timer, type){
+			this.element.style.webkitTransitionProperty = "-webkit-transform";
+			this.element.style.webkitTransitionDuration = timer;
+			this.element.style.webkitTransitionTimingFunction = type;
+			this.element.style.webkitTransform = getTranslate(x, y);
+		},
+
+		getTouchDist:function(e){
+			var x1 = 0,y1=0,x2=0,y2=0,x3=0,y3=0,result={};
+			x1=e.touches[0].pageX;
+			y1=e.touches[0].pageY;
+			x2=e.touches[1].pageX;
+			y2=e.touches[1].pageY;
+
+			if(!x1 || !x2) return;
+
+			y3=(y1+y2)/2
+			x3=(x1+x2)/2
+			result = {
+				dist:Math.round(Math.sqrt(Math.pow(x1-x2,2)+Math.pow(y1-y2,2))),
+				x:x3,
+				y:y3
+			};
+			return result;
+		},		
+		eventStop:function(e){
+			e.preventDefault();
+			e.stopPropagation();
+		},
+		// 重置坐标数据
+		
+	}
+	var ImagesZoom = new ImagesZoom();
+	ImagesZoom.init();
+	</script>
+</body>
+</html>
