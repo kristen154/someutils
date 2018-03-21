@@ -1,0 +1,60 @@
+﻿<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="utf-8">
+<title>上传二维码到服务器</title>
+<link rel="stylesheet" type="text/css" href="../css/main.css" />
+<style type="text/css">
+.demo{width:100%; margin:40px auto 0 auto; min-height:250px;}
+.demo p{line-height:30px}
+#code{margin-top:10px}
+</style>
+<script type="text/javascript" src="jquery.js"></script>
+<script type="text/javascript" src="jquery.qrcode.min.js"></script>
+<script type="text/javascript" src="canvas2image.js"></script>
+<script type="text/javascript" src="base64.js"></script>
+<script type="text/javascript">
+
+$(function(){
+  var str = "url"
+  var pageInde = 1;
+  var p = 1;
+  var count = 10;
+  for(var i=1;i<=count;i++){
+    var urlstr = str+"?pageIndex="+i+"#p="+i;
+    $("#code").qrcode({
+      render: "canvas",
+      width: 200,
+      height:200,
+      text: urlstr
+    });}})
+
+function down(){
+  $.ajaxSetup({ async : false });    
+  var canvases = document.getElementsByTagName("canvas");
+  for(var i =0;i<canvases.length;i++){
+    var base64= canvases[i].toDataURL("image/png");
+    $.post('upload.php',{"img":base64,"filename":i+"file"},function(data){if(data){console.log(1)}else{console.log(2)}})
+  }
+  
+}
+</script>
+</head>
+
+<body>
+<style>
+  #code canvas{
+    margin:8px;
+  }
+</style>
+
+
+<div id="main">
+   <div class="demo">
+   		<div id="code"></div>
+      <button onclick="down()">download</button>
+   </div>
+
+</div>
+</body>
+</html>
