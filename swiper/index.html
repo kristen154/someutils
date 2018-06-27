@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>仿微信图片预览</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+	<style>#article ,#article img{width:100%;}</style>
+</head>
+<body>
+
+<!--dom结构，基本适用于富文本-->
+<div id="article">
+    ...
+    <img src="images/1.jpg"/>
+    <img src="images/2.jpg"/>
+    ...
+</div>
+
+
+<!--引入jquery-->
+<script type="text/javascript" src="js/jquery.js"></script>
+<link rel="stylesheet" type="text/css" href="css/swiper.css"><!--先引入css，试过使用js引入是不行滴-->
+<style>
+     .swiper-container {position: fixed;top:0;background: #000;width: 100%;height: 100%;} 
+</style>
+
+<script type="text/javascript">
+var is_load_js = true;var swiper = {};
+$("#article img").click(
+    function(){
+        var img_index = $("#article img").index(this);//点击了第几张图
+        //首次点击引入js，向文档添加元素并初始化swiper
+        if(is_load_js){
+            var swiper_slider = '';
+            $.getScript("js/swiper.js",function(){ //加载swiper.js,成功后，并执行回调函数
+               var swiper_container = $('<div class="swiper-container "></div>');
+               var swiper_wrapper = $('<div class="swiper-wrapper"></div>');
+               var swiper_icon = '<div class="swiper-pagination swiper-pagination-white"></div>';
+               $("#article img").each(function(){
+                //swiper_slider += '<div class="swiper-slide"><div class="swiper-zoom-container"><img src="'+$(this).attr("original")+'"></div></div>';//由于使用了lazyload,真正的src在original里
+                swiper_slider += '<div class="swiper-slide"><div class="swiper-zoom-container"><img src="'+$(this).attr("src")+'"></div></div>';//由于使用了lazyload,真正的src在original里
+               });
+               var btn = $('<div id="closs-btn" style="padding:10px;background: red;position:absolute;top:10px;right:10px;z-index:9999;color:#fff;text-align: center;line-height:12px;" onClick="$(\'.swiper-container\').hide();">×</div>');//设置关闭按钮，并绑定事件
+               swiper_wrapper.append(swiper_slider);
+               swiper_container.append(swiper_wrapper);
+               swiper_container.append(swiper_icon);
+               swiper_container.append(btn);
+               $("body").append(swiper_container);
+                swiper = new Swiper('.swiper-container', {
+                  zoom: true,
+                  initialSlide:img_index,//初始显示第几张
+                  pagination: {
+                    el: '.swiper-pagination',
+                  },
+                });
+            });
+            is_load_js = false;//表示已经初始化了swiper
+        }else{
+            swiper.zoom.out(); //清除上一次放大
+            swiper.slideTo(img_index,0.1,false);//点击第几张显示第几张
+            $('.swiper-container').show();
+        }
+
+    }
+);
+
+</script>
+</body>
+</html>
