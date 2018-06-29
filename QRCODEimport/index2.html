@@ -1,0 +1,95 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="utf-8">
+<title>批量生成二维码并服务器</title>
+<link rel="stylesheet" type="text/css" href="../css/main.css" />
+<style type="text/css">
+.demo{width:100%; margin:40px auto 0 auto; min-height:250px;}
+.demo p{line-height:30px}
+#code{margin-top:10px}
+</style>
+<script type="text/javascript" src="jquery.js"></script>
+<script type="text/javascript" src="jquery.qrcode.min.js"></script>
+<script type="text/javascript" src="canvas2image.js"></script>
+<script type="text/javascript">
+  var arr = [];//作为全局变量
+  arr.push(['https://www.baidu.com','百度'])
+  arr.push(['https://http://www.sina.com.cn/','新浪'])
+
+$(function(){
+  console.log(arr.length)
+  for(var i=0;i<arr.length;i++){
+    var urlstr = arr[i][0];
+    console.log(urlstr)
+    $("#code").qrcode({
+      render: "canvas",
+      width:1000,
+      height:1000,
+      text: urlstr,
+      foreground: "#FE007F" //前景颜色
+    });}
+    
+  })
+
+</script>
+<style>
+  #code canvas{
+    margin:8px;
+  }
+</style>
+</head>
+
+<body>
+<div id="main">
+   <div class="demo">
+   		<div id="code"></div>
+      <button id="btn" onclick="down()">download</button>
+      <button id="btn" onclick="addText(1000,120,20)">count</button>
+   </div>
+</div>
+
+<script>
+/**
+ * [addText 向canvas添加文字]
+ * @param {[type]} canvassize [canvas宽高]
+ * @param {[type]} fontsize   [文字大小]
+ * @param {[type]} padding    [周围留空隙]
+ */
+function addText(canvassize,fontsize,padding,divBackground="#fff",fontColor="#a50054"){
+    var canvases = document.getElementsByTagName('canvas');
+    var fontsizeH = fontsize+padding*3//文字高度
+    var rectW = 0;
+    var centerx = canvassize/2 - rectW/2;//居中的x
+    var centery = canvassize/2 - fontsizeH/2//居中的y
+    //var divBackground = "#fff";
+    //var fontColor = "#a50054";
+    var width = 0;
+    for(var i=0;i<canvases.length;i++){
+      var ctx = canvases[i].getContext("2d");
+      width = ctx.measureText(arr[i][1]).width;//文字长度,不知道为什么这里的width是中文字数的10倍，故需要乘上fontsize/10获取到真实的文字宽度
+      rectW = width*fontsize/10+padding*2;//长方形背景宽度，应左右留padding
+      centerx = canvassize/2 - rectW/2;//长方形背景居中的x
+      centery = canvassize/2 - fontsizeH/2//长方形背景居中的y
+      ctx.fillStyle=divBackground//长方形背景颜色
+      ctx.fillRect (centerx,centery,rectW, fontsizeH)
+      ctx.font = fontsize+"px Calibri";//设置文字大小
+      ctx.fillStyle = fontColor;
+      ctx.fillText(arr[i][1], centerx+padding, centery+fontsize+padding/2)//经测试，若参数y只填centery，则文字显示在长方形背景的上边，所以需要加上fontsize长方形背景才能包裹文字
+    }
+  }
+  /**
+   * [down ajax将二维码上传到服务器]
+   * @return {[type]} [description]
+   */
+  function down(){
+      $.ajaxSetup({ async : false });    
+      var canvases = document.getElementsByTagName("canvas");
+      for(var i =0;i<arr.length;i++){
+        var base64= canvases[i].toDataURL("image/png");
+        $.post('upload.php',{"img":base64,"filename":encodeURI(arr[i][1])},function(data){if(data){console.log(1)}else{console.log(2)}})
+      }
+    }
+</script>
+</body>
+</html>
