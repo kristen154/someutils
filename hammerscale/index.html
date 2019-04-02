@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>图片缩放</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<style type="text/css">
+		html,body,#scale,#scale img{
+			height:100%;
+			width:100%;
+			margin:0;
+			padding:0;
+		}
+		#scale{
+			position:absolute;
+			background:#54a;
+			overflow: hidden;
+			top:0;
+			bottom:0;
+			left:0;
+			right:0;
+		}
+		#scale img{
+			transition: 0s ease all;
+			position:absolute;
+			top:0;
+		}
+	</style>
+	 <script src="hammer.js"></script>
+</head>
+<body>
+<div id="scale">
+	<img id="img1" src="timg1.jpg" alt="">
+</div>
+<script type="text/javascript">
+
+function point2D(x,y){
+	return {x : x,y : y};
+}
+
+var reqAnimationFrame = (function () {
+    return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
+        window.setTimeout(callback, 1000 / 60);
+    };
+})();
+
+
+var tMatrix = [1,0,0,1,0,0]//x缩放，无，无，y缩放，x平移，y平移
+
+var initScale = 1;//初始化scale
+var el =  document.getElementById("img1");//获取元素
+var mc = new Hammer.Manager(el)
+var ticking = false
+var poscenter = point2D(0,0);//缓存双指的中心坐标
+var duration = '';//设置过渡效果，用于双击缩放效果
+var lastTranslate = point2D(0,0);//记录上次的偏移值
+var lastcenter= point2D(el.offsetWidth/2,el.offsetHeight/2)//图像的中心点，用于对比双指中心点
+
+var center = lastcenter
+mc.add(new Hammer.Pan({ threshold: 0, pointers: 1 }))
+mc.add(new Hammer.Pinch({ threshold: 0 }))
+mc.add( new Hammer.Tap({ event: 'doubletap', taps: 2 }) );
+mc.on("panmove", onPan);
+mc.on("panstart",onPanStart)
+mc.on("pinchmove", onPinch);
+mc.on("pinchstart",onPinchStart);
+mc.on("doubletap",onDoubleTap);
+
+function onPanStart(ev){
+	lastTranslate = point2D(tMatrix[4],tMatrix[5])//缓存上一次的偏移值
+}
+function onPan(ev){	
+		duration = ''
+		el.className = ''			
+		tMatrix[4] = lastTranslate.x + ev.deltaX
+		tMatrix[5] = lastTranslate.y + ev.deltaY
+		requestElementUpdate('onpan');
+	
+}
+function onPinchStart(ev){
+	duration = '';
+	lastTranslate = point2D(tMatrix[4],tMatrix[5])//记录上一次的偏移值
+	initScale = tMatrix[0] || 1;
+	poscenter = point2D(ev.center.x, ev.center.y)
+	
+	lastcenter = point2D(center.x + lastTranslate.x,center.y + lastTranslate.y)//重新计算放大后的中心坐标
+	poscenter = point2D(ev.center.x - lastcenter.x, ev.center.y-lastcenter.y)
+	console.log("center",lastcenter.x,lastcenter.y)
+	
+	requestElementUpdate('onpinchStart');
+}
+function onPinch(ev){
+	var nowScale = tMatrix[0] = tMatrix[3] = initScale * ev.scale;
+	var composscal = (1 - ev.scale) 
+	//tMatrix[4] = poscenter.x - ((poscenter.x - lastcenter.x) *  ev.scale + lastcenter.x)  + lastTranslate.x//最后加上上一次的偏移值
+	//tMatrix[5] = poscenter.y - ((poscenter.y - lastcenter.y) *  ev.scale + lastcenter.y)  + lastTranslate.y
+	tMatrix[4] = (1 - ev.scale) * poscenter.x + lastTranslate.x
+	tMatrix[5] = (1 - ev.scale) * poscenter.y + lastTranslate.y
+	requestElementUpdate('onpinch');	
+}
+
+function onDoubleTap(ev){
+	duration = ".3s ease all";
+	var nowScale = tMatrix[0];
+	if(nowScale != 1 || tMatrix[4]!= 0){
+		//scale不等于1，要重回1
+		tMatrix[0] = tMatrix[3] = 1;
+		tMatrix[4] = tMatrix[5] = 0;
+	}else{
+		var pointer = ev.center
+		var scale = 2
+		tMatrix[0] = tMatrix[3] = scale
+		//var last = point2D
+		//tMatrix[4] = pointer.x - ((pointer.x-lastcenter.x) * scale + lastcenter.x);
+		//tMatrix[5] = pointer.y - ((pointer.y-lastcenter.y) * scale + lastcenter.y);
+		tMatrix[4] = (1 - scale) * ( pointer.x - center.x) 
+		tMatrix[5] = (1 - scale) * ( pointer.y - center.y)
+	}
+	requestElementUpdate('doubleTap');
+}
+
+function updateElementTransform() {
+	el.style.transition = duration
+    var tmp = tMatrix.join(',')
+    console.log(tmp)
+    el.style.transform = 'matrix(' + tmp + ')';
+    ticking = false;
+}
+
+function requestElementUpdate() {
+	arguments && console.log(arguments[0])
+
+    if(!ticking) {
+        reqAnimationFrame(updateElementTransform);
+        ticking = true;
+    }
+}
+
+/**
+初始化设置
+*/
+
+requestElementUpdate();
+
+</script>
+</body>
+</html>
