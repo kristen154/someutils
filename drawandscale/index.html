@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <style type="text/css">
+        body{
+            margin:0;
+                padding:0;
+        }
+            .box{
+                height: 0;
+                width: 0;
+                position: absolute;
+                opacity: 0.5;
+                background : red;
+                cursor : move;
+                z-index:20;
+                
+            }
+            .smallbox{
+                width:6px;
+                height: 6px;
+                background:blue;
+                position:absolute;
+                top:-3px;
+                left:-3px;
+
+            }
+            .scale{
+                border:1px solid blue;
+                cursor:move;
+                height: 100px;
+                width:100px;
+                position:absolute;
+                top:0;
+                left:0;
+                z-index:99;
+               /*  display:none; */
+            }
+            #bigscale{
+                height:500px;
+                width: 500px;
+                background:#b6a7ff;
+                position:relative;
+            }
+        .scale{
+            position:absolute;
+            border:1px solid blue;
+            height:100px;
+            width:100px;
+            cursor:move;
+            box-sizing: content-box;
+            display:none;
+        }
+        .scale span{
+            position:absolute;
+            height:6px;
+            width:6px;
+            margin-top:-4px;
+            margin-left:-4px;
+            font-size: 0px;
+            display:block;
+            overflow: hidden;
+            background:red;
+        }
+
+        .hand0{
+            top:0;
+            left:0;
+            cursor:nw-resize;
+        }
+        .hand1{
+            cursor:n-resize;
+            top:0;
+            left:50%;
+            
+        }
+        .hand2{
+            cursor:ne-resize;
+            top:0;
+            left:100%;
+
+        }
+        .hand3{
+            cursor:w-resize;
+            top:50%;
+            left:0;
+        }
+        .hand4{
+            cursor:e-resize;
+            top:50%;
+            left:100%;
+        }
+        .hand5{
+            cursor:sw-resize;
+            top:100%;
+            left:0;
+        }
+        .hand6{
+            cursor:s-resize;
+            top:100%;
+            left:50%;
+        }
+        .hand7{
+            cursor:se-resize;
+            top:100%;
+            left:100%;
+        }
+        .scale span.hand2,.scale span.hand4,.scale span.hand7{margin-left:-3px;}
+        .scale span.hand5,.scale span.hand6,.scale span.hand7{
+            margin-top:-3px;
+        }
+        </style>
+    </head>
+    <body>
+    <div id="scale-border" class="scale">
+        <span class="hand0"></span>
+        <span class="hand1"></span>
+        <span class="hand2"></span>
+        <span class="hand3"></span>
+        <span class="hand4"></span>
+        <span class="hand5"></span>
+        <span class="hand6"></span>
+        <span class="hand7"></span>
+    </div>
+    <div id="bigscale">
+        
+    </div>
+        <script type="text/javascript">
+        window.onload = function(e){
+
+        //代理单例
+        var ProxyScalebox = (function(){
+            var instance;
+            return function(obj){
+                if(!instance){
+                    instance =  new Scalebox(obj);
+                }
+                return instance;
+            }
+        })()
+        //处理元素缩放的类
+        function Scalebox(obj){
+            
+            this.init(obj);//初始化
+            //为各种事件绑定this为当前类的实例对象
+            this.dealmousedown = bind(this.onmousedown,this);//缓存方法名字
+            this.dealmousemove = bind(this.moveChangePos,this)
+            this.dealmouseup = bind(this.onmouseup,this)
+            this.dealWH = bind(this.dealScale,this)
+            this.dealChildUp = bind(this.dealChildUp,this)
+
+            this.el.addEventListener('mousedown', this.dealmousedown,false)
+            
+            this.isDisplay = "none"
+            
+        }
+
+        Scalebox.prototype = {
+            init : function(obj){
+                this.el = document.getElementById('scale-border');
+                this.setBottom(obj);
+                //this.bottom = el;//变化框下的元素
+                this.initTop = this.bottom.offsetTop
+                this.initLeft = this.bottom.offsetLeft
+                this.initWidth = this.bottom.offsetWidth;
+                this.initHeight = this.bottom.offsetHeight;
+
+                this.setPos(this.el,this.bottom.offsetTop,this.bottom.offsetLeft)//设置位置
+                this.setWH(this.el,this.bottom.offsetWidth,this.bottom.offsetHeight)
+            },
+            //设置bottom
+            setBottom: function(el){
+                this.bottom = el
+            },
+            getBottom: function(){
+                return this.bottom;
+            },
+            getEl : function(){
+                return this.el;
+            },
+            getBottomPos : function(){
+                return {top : this.bottom.offsetTop, left: this.bottom.offsetLeft}
+            },
+            setInitPos:function(top,left){//记录触发点击时的位置
+                this.initTop = top
+                this.initLeft = left
+            },
+            getInitPos: function(){
+                return {top: this.initTop, left: this.initLeft};
+            },
+            setInitWH : function(w, h){
+                this.initWidth = w;
+                this.initHeight = h;
+            },
+            getInitWH : function(){
+                return {width: this.initWidth,height : this.initHeight};
+            },
+            
+            getBottomWH: function(el){
+                return {width: this.bottom.offsetWidth, height: this.bottom.offsetHeight}
+            },
+
+            setWH : function(ele,w,h){//设置大小
+                ele.style.width = w + 'px';
+                ele.style.height = h +'px';
+            },
+            setPos : function(el,top,left){
+                el.style.top = top + 'px';
+                el.style.left = left + 'px';
+            },
+
+            onmousedown : function(e){
+                this.startX = e.pageX//记录鼠标点击的位置
+                this.startY = e.pageY
+
+                this.initW = this.startX - this.initWidth  //mouse时currentWidth = e.pageX - this.startX + this.initWidth，避免过多计算，在mousedown计算
+                this.initH = this.startY - this.initHeight
+                this.initTop = this.el.offsetTop
+                this.initLeft = this.el.offsetLeft
+                this.target = e.target;
+                this.change = this.handleScale(this.target.className,e);
+                if(e.target.className.match(/hand/)){
+                    document.addEventListener('mousemove', this.dealWH,false);//绑定docuemnt是为了解决鼠标过快离开元素
+                    this.el.addEventListener('mouseup',this.dealChildUp,false);
+                }else{
+                    this.startX = e.offsetX + 1;//鼠标在元素内的相对位置，并修复快速点击元素自动偏移1px
+                    this.startY  = e.offsetY + 1;
+                    this.el.addEventListener('mousemove', this.dealmousemove,false)
+                    this.el.addEventListener('mouseup', this.dealmouseup,false)
+                }
+                
+            },
+            moveChangePos : function(e){
+                
+                this.change = this.handleScale(this.target.className,e);
+                this.setPos(this.el, this.change.top, this.change.left)
+                this.setPos(this.bottom, this.change.top, this.change.left)
+            },
+            onmouseup : function(e){
+                e.stopPropagation();
+                this.el.removeEventListener('mousemove',this.dealmousemove);
+            },
+            dealScale :  function(e){//拖动子元素缩放
+              
+                e.stopPropagation();//阻止冒泡
+                this.change = this.handleScale(this.target.className,e);//事件委托给父元素，避免绑定过多事件
+                if((e.pageX - this.startX)<0){
+                    this.setPos(this.el,this.init)
+                }
+                this.setWH(this.el,this.change.width,this.change.height)
+                this.setWH(this.bottom,this.change.width,this.change.height) 
+                this.setPos(this.el,this.change.top,this.change.left)
+                this.setPos(this.bottom,this.change.top,this.change.left)
+                
+
+            },
+            //采用决策者模式避免过多的判断
+            handleScale: function(strag, e){//拖动各个子元素具体操作
+                var width= this.initW,//为了减少计算在mousedown计算
+                    height = this.initH,
+
+                    top = this.initTop,
+                    left = this.initLeft,
+                    initWidth = this.initWidth,
+                    initHeight = this.initHeight,
+                    initTop = this.initTop,
+                    initLeft = this.initLeft,
+                    startX = this.startX,//第一次点击时鼠标得位置
+                    startY = this.startY,
+                    tmpH = 0,
+                    tmpW = 0;
+                var stragtegy = {//决策者
+                    hand7: function(e){
+                        tmpH = e.pageY - height;
+                        tmpW  = e.pageX - width;
+                        return {width: tmpW,height:tmpH, top: initTop, left: initLeft}
+                    },
+                    hand6: function(e){
+                        tmpH = e.pageY - height
+                        return {width: initWidth,height: tmpH, top: initTop, left: initLeft}
+                        
+                    },
+                    hand5: function(e){
+                        tmpH = e.pageY - height
+                        tmpW = -(e.pageX - startX)  + initWidth 
+                        initLeft = e.pageX
+                        return {width: tmpW ,height: tmpH, top: initTop, left: initLeft}
+                    },
+                    hand4: function(e){
+                        tmpW = e.pageX - width
+                        return {width: tmpW,height: initHeight, top: initTop, left: initLeft}
+                    },
+                    hand3: function(e){
+                        tmpW = -(e.pageX - startX)  + initWidth 
+                        initLeft = e.pageX
+                        return {width: tmpW,height: initHeight, top: initTop, left: initLeft}
+                    },
+                    hand2: function(e){
+                        tmpW =  e.pageX - width;
+                        tmpH = -(e.pageY - startY)  + initHeight ;
+                        initTop = e.pageY
+                        return {width: tmpW,height: tmpH, top: initTop, left: initLeft}
+                    },
+                    hand1: function(e){
+
+                        tmpH = -(e.pageY - startY)  + initHeight ;
+                        initTop = e.pageY
+                        return {width: initWidth,height: tmpH, top: initTop, left: initLeft}
+                    },
+                    hand0: function(e){
+                        tmpH = -(e.pageY - startY)  + initHeight ;
+                        tmpW = -(e.pageX - startX)  + initWidth 
+                        initLeft = e.pageX
+                        initTop = e.pageY
+                        return {width: tmpW ,height: tmpH, top: initTop, left: initLeft}
+                    },
+                    scale: function(e){
+                        var top = e.pageY - startY,
+                            left = e.pageX - startX;
+                        return {width: initWidth ,height: initHeight, top: top, left: left}
+                    }
+                };
+                
+                return stragtegy[strag] && stragtegy[strag](e)
+            },
+
+            dealChildUp : function(e){
+                e.stopPropagation();
+                if(!this.change){
+                    return;//解决多个元素点击是会报错得问题
+                }
+                this.setInitWH(this.change.width,this.change.height)
+                this.setInitPos(this.change.top,this.change.left)//重新设置宽高及位置
+
+                this.change = null;
+                document.removeEventListener('mousemove',this.dealWH)
+            },
+
+            removeBottom : function(p){//移除变化框底下的元素
+                p = p || document
+                p.removeChild(this.bottom);
+                this.setDisplay('none')
+            },
+
+            setDisplay: function(display){
+                this.el.style.display = display
+            }
+        }
+        //创建新的元素
+        var CreatedivObj = function(){
+            this.el = this.init();
+            //return this.el;
+        }
+        CreatedivObj.prototype = {
+            init : function(){
+                return document.createElement('div')
+            },
+            setPos: function(l,t){
+                this.el.style.top = t + 'px';
+                this.el.style.left = l + 'px';
+                
+            },
+            setWH : function(w,h){
+                this.el.style.width = w + 'px';
+                this.el.style.height = h + 'px';
+            },
+            setId : function(id){
+                this.el.id = id
+            },
+            getId : function(){
+                return this.el.id;
+            },
+            setClassName :function(className){
+                this.el.className = className;
+            },
+            getClassName :function(className){
+                return this.el.className;
+            },
+            removeAttr : function(attr){
+                this.el.removeAttribute(attr)
+            }
+
+        }
+
+
+        //处理鼠标拖动时绘制的数据
+        function Draw(p){
+            this.panel = p || document;
+            this.init();
+            this.panel.addEventListener('mousedown', bind(this.dealmousedown,this),false);//将dealmousedown的上下文绑定为this
+        }
+        Draw.prototype = {
+            init : function(){
+                this.startX = 0;
+                this.startY = 0;
+                this.diffX = 0;
+                this.diffY = 0;
+                this.dragging = false;
+                this.scaleBox = null;
+                this.activeBox = null;
+                this.copyBox = {};
+               
+
+            },
+            dealmousedown : function(e){    
+                e.stopPropagation();
+                this.el = e.target;
+                this.scaleBox =  new ProxyScalebox(this.el)
+                var that = this
+                if(this.el.className.match(/box/)){
+                    this.scaleBox.init(this.el);
+                    this.scaleBox.setDisplay('block')
+                }else{
+                    this.activeBox = new CreatedivObj();
+                    this.scaleBox.setDisplay('none')
+                    this.startX = e.pageX;
+                    this.startY = e.pageY;
+                    this.activeBox.setClassName('box');
+                    this.activeBox.setPos(this.startX, this.startY);
+                    this.panel.appendChild(this.activeBox.el)
+                    var dealmousemove = bind(that.dealmousemove,that);//将当前对象绑定到函数里
+                    this.panel.addEventListener('mousemove',dealmousemove);
+                    this.panel.onmouseup = function(e){
+                        that.panel.removeEventListener('mousemove',dealmousemove);
+                        that.activeBox = null;//清除缓存
+                    }
+
+                }
+                
+
+            },
+            dealmousemove : function(e){
+                if(this.activeBox){
+                    var width = e.pageX - this.startX;
+                    var height = e.pageY - this.startY;
+                    this.activeBox.setWH(width,height);
+                }
+                
+            },
+            deleteElement : function(){//删除选中的元素
+                this.scaleBox.removeBottom(this.panel)
+            },
+            copyElement: function(){//复制选中的元素
+                this.copyBox.pos = this.scaleBox.getBottomPos();
+                this.copyBox.size = this.scaleBox.getBottomWH(); 
+            },
+            parseElement: function(){//粘贴选中的元素
+                this.activeBox = new CreatedivObj();
+                this.activeBox.setClassName('box');
+                this.activeBox.setWH(this.copyBox.size.width,this.copyBox.size.height)
+                this.copyBox.pos.left += 10
+                this.copyBox.pos.top += 10
+                this.activeBox.setPos(this.copyBox.pos.left,this.copyBox.pos.top)
+                this.panel.appendChild(this.activeBox.el)
+                this.activBox = null;
+
+            }
+        }
+
+        function bind(func, context){
+            return function(){
+               return func.apply(context,arguments)
+            }
+        }
+
+
+        var a = document.getElementById('bigscale')
+        var d = new Draw(a)
+        var btn = document.getElementById('btn');
+        var btn1 = document.getElementById('btn1');
+        var btn2 = document.getElementById('btn2');
+        btn.onclick = function(){
+            d.deleteElement()
+        }
+        btn1.onclick = function(){
+            d.copyElement()
+        }
+        btn2.onclick = function(){
+            d.parseElement()
+        }
+
+    }
+
+
+
+        </script>
+        <button id="btn">删除选中项</button>
+        <button id="btn1">复制选中项</button>
+        <button id="btn2">粘贴选中项</button>
+    </body>
+</html>
+
